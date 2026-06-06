@@ -1,0 +1,1142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShopPilot — AI Shopping Decision Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ─── Design Tokens ───────────────────────────────────────────── */
+  :root {
+    --cream:      #F5F0E8;
+    --parchment:  #EDE5D4;
+    --gold:       #C9A84C;
+    --gold-light: #E8C96A;
+    --gold-pale:  #F2E4B8;
+    --charcoal:   #1A1714;
+    --warm-black: #0E0C0A;
+    --ink:        #2C2520;
+    --mist:       #8A7F74;
+    --blush:      #D4A5A5;
+    --sage:       #A0A882;
+    --electric:   #7EB8C4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background-color: var(--warm-black);
+    color: var(--cream);
+    font-family: 'Montserrat', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Film-grain overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 1000;
+    opacity: 0.55;
+  }
+
+  /* Ambient glow */
+  .ambient {
+    position: fixed;
+    top: -30%; left: 50%;
+    transform: translateX(-50%);
+    width: 80vw; height: 60vh;
+    background: radial-gradient(ellipse, rgba(201,168,76,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── Header ──────────────────────────────────────────────────── */
+  header {
+    position: relative; z-index: 10;
+    padding: 40px 60px 28px;
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.2rem; font-weight: 300; letter-spacing: 0.08em;
+    color: var(--cream);
+  }
+  .logo span { color: var(--gold); font-style: italic; }
+  .header-right { text-align: right; }
+  .tagline {
+    font-size: 0.58rem; letter-spacing: 0.32em;
+    text-transform: uppercase; color: var(--mist);
+    display: block;
+  }
+  .header-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 6px;
+    padding: 4px 10px;
+    border: 1px solid rgba(201,168,76,0.25);
+    border-radius: 100px;
+    font-size: 0.52rem; letter-spacing: 0.2em;
+    text-transform: uppercase; color: var(--gold);
+  }
+  .badge-dot {
+    width: 5px; height: 5px;
+    background: var(--gold); border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  /* ─── Main ────────────────────────────────────────────────────── */
+  main {
+    position: relative; z-index: 10;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+  }
+
+  /* ─── Hero ────────────────────────────────────────────────────── */
+  .hero {
+    text-align: center; margin-bottom: 64px;
+    animation: fadeUp 0.9s ease both;
+  }
+  .hero-eyebrow {
+    font-size: 0.58rem; letter-spacing: 0.45em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 22px;
+  }
+  .hero h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(2.6rem, 5vw, 4.4rem);
+    font-weight: 300; line-height: 1.06;
+    color: var(--cream); margin-bottom: 22px;
+  }
+  .hero h1 em { font-style: italic; color: var(--gold); }
+  .hero-sub {
+    font-size: 0.72rem; letter-spacing: 0.1em;
+    color: var(--mist); max-width: 520px;
+    margin: 0 auto; line-height: 2;
+  }
+  .hero-pills {
+    display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 10px; margin-top: 28px;
+  }
+  .hero-pill {
+    padding: 6px 16px;
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 100px;
+    font-size: 0.6rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--mist);
+  }
+
+  /* ─── Form Card ───────────────────────────────────────────────── */
+  .form-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(201,168,76,0.18);
+    border-radius: 2px; padding: 52px 56px;
+    backdrop-filter: blur(10px);
+    animation: fadeUp 0.9s 0.15s ease both;
+    position: relative; overflow: hidden;
+  }
+  .form-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .form-section-label {
+    font-size: 0.55rem; letter-spacing: 0.4em;
+    text-transform: uppercase; color: var(--mist);
+    margin-bottom: 24px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .form-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 32px; margin-bottom: 40px;
+  }
+  .field-group { display: flex; flex-direction: column; gap: 10px; }
+  .field-label {
+    font-size: 0.57rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--gold); font-weight: 500;
+  }
+  .field-input {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(201,168,76,0.2); border-radius: 1px;
+    padding: 14px 18px; color: var(--cream);
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.82rem; font-weight: 300; letter-spacing: 0.05em;
+    transition: border-color 0.3s, background 0.3s;
+    outline: none; width: 100%;
+  }
+  .field-input:focus { border-color: var(--gold); background: rgba(201,168,76,0.04); }
+  .field-input::placeholder { color: var(--mist); opacity: 0.6; }
+  select.field-input option { background: var(--ink); color: var(--cream); }
+
+  /* ─── Optimization Goal ───────────────────────────────────────── */
+  .goal-section { margin-bottom: 40px; }
+  .goal-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 14px; margin-top: 14px;
+  }
+  .goal-card {
+    border: 1px solid rgba(201,168,76,0.18);
+    border-radius: 2px; padding: 20px 18px;
+    cursor: pointer; transition: all 0.3s;
+    background: transparent; text-align: left;
+    font-family: 'Montserrat', sans-serif;
+    position: relative; overflow: hidden;
+  }
+  .goal-card::before {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+    background: var(--gold); transform: scaleX(0);
+    transition: transform 0.3s; transform-origin: left;
+  }
+  .goal-card:hover { border-color: rgba(201,168,76,0.4); background: rgba(201,168,76,0.03); }
+  .goal-card:hover::before { transform: scaleX(0.5); }
+  .goal-card.active {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.07);
+    box-shadow: 0 0 30px rgba(201,168,76,0.08);
+  }
+  .goal-card.active::before { transform: scaleX(1); }
+  .goal-icon { font-size: 1.2rem; margin-bottom: 10px; display: block; }
+  .goal-name {
+    font-size: 0.68rem; font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--cream); margin-bottom: 6px;
+  }
+  .goal-card.active .goal-name { color: var(--gold); }
+  .goal-desc {
+    font-size: 0.62rem; color: var(--mist);
+    line-height: 1.7; letter-spacing: 0.03em;
+  }
+
+  /* ─── Style chips ─────────────────────────────────────────────── */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .chip {
+    padding: 7px 16px;
+    border: 1px solid rgba(201,168,76,0.2); border-radius: 100px;
+    font-size: 0.63rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--mist); cursor: pointer; transition: all 0.25s;
+    background: transparent;
+    font-family: 'Montserrat', sans-serif; font-weight: 400;
+  }
+  .chip:hover { border-color: var(--gold); color: var(--gold); }
+  .chip.active { background: var(--gold); border-color: var(--gold); color: var(--warm-black); font-weight: 500; }
+
+  /* ─── CTA ─────────────────────────────────────────────────────── */
+  .cta-row { display: flex; justify-content: center; }
+  .btn-generate {
+    background: var(--gold); color: var(--warm-black);
+    border: none; padding: 18px 64px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.65rem; font-weight: 600;
+    letter-spacing: 0.35em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+    position: relative; overflow: hidden; border-radius: 1px;
+  }
+  .btn-generate::before {
+    content: '';
+    position: absolute; top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+  }
+  .btn-generate:hover::before { left: 100%; }
+  .btn-generate:hover {
+    background: var(--gold-light);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 40px rgba(201,168,76,0.3);
+  }
+  .btn-generate:disabled { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ─── Loading ─────────────────────────────────────────────────── */
+  .loading-state { text-align: center; padding: 80px 40px; display: none; }
+  .loading-state.visible { display: block; }
+  .loading-ornament {
+    width: 48px; height: 48px;
+    border: 1px solid rgba(201,168,76,0.3);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 1.2s linear infinite;
+    margin: 0 auto 28px;
+  }
+  .loading-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem; font-weight: 300; font-style: italic;
+    color: var(--mist); letter-spacing: 0.05em;
+  }
+  .loading-sub {
+    font-size: 0.58rem; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--mist);
+    opacity: 0.5; margin-top: 8px;
+  }
+
+  /* ─── Results ─────────────────────────────────────────────────── */
+  .results { display: none; margin-top: 56px; animation: fadeUp 0.7s ease both; }
+  .results.visible { display: block; }
+  .results-header { text-align: center; margin-bottom: 48px; }
+  .results-eyebrow {
+    font-size: 0.58rem; letter-spacing: 0.4em;
+    text-transform: uppercase; color: var(--gold); margin-bottom: 14px;
+  }
+  .results-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.4rem; font-weight: 300; color: var(--cream);
+  }
+  .results-goal-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    margin-top: 14px; padding: 6px 18px;
+    border: 1px solid rgba(201,168,76,0.3); border-radius: 100px;
+    font-size: 0.58rem; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--gold);
+  }
+
+  /* ─── Score Bar ───────────────────────────────────────────────── */
+  .score-row {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 16px; margin-bottom: 32px;
+  }
+  .score-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(201,168,76,0.12);
+    border-radius: 2px; padding: 20px 22px;
+  }
+  .score-label {
+    font-size: 0.55rem; letter-spacing: 0.3em;
+    text-transform: uppercase; color: var(--mist); margin-bottom: 10px;
+  }
+  .score-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.8rem; font-weight: 300; color: var(--cream);
+  }
+  .score-value span { font-size: 0.9rem; color: var(--mist); }
+  .score-bar-track {
+    height: 2px; background: rgba(255,255,255,0.07);
+    border-radius: 2px; margin-top: 10px; overflow: hidden;
+  }
+  .score-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    border-radius: 2px; width: 0;
+    transition: width 1.4s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ─── Budget Overview ─────────────────────────────────────────── */
+  .budget-overview {
+    background: linear-gradient(135deg, rgba(201,168,76,0.06) 0%, rgba(201,168,76,0.02) 100%);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 36px 44px; margin-bottom: 32px;
+    border-radius: 2px; position: relative; overflow: hidden;
+  }
+  .budget-overview::after {
+    content: ''; position: absolute;
+    bottom: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .budget-label {
+    font-size: 0.57rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--mist); margin-bottom: 20px;
+  }
+  .budget-bars { display: flex; flex-direction: column; gap: 12px; }
+  .budget-bar-row { display: flex; align-items: center; gap: 16px; }
+  .budget-bar-name {
+    font-size: 0.67rem; letter-spacing: 0.06em;
+    color: var(--cream); width: 150px; flex-shrink: 0;
+  }
+  .budget-bar-track {
+    flex: 1; height: 3px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; overflow: hidden;
+  }
+  .budget-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    border-radius: 2px; width: 0;
+    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+  }
+  .budget-bar-amount {
+    font-size: 0.67rem; color: var(--gold); font-weight: 400;
+    width: 80px; text-align: right;
+  }
+  .total-row {
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid rgba(201,168,76,0.2);
+    border-bottom: 1px solid rgba(201,168,76,0.2);
+    padding: 20px 0; margin: 28px 0 0;
+  }
+  .total-label { font-size: 0.6rem; letter-spacing: 0.3em; text-transform: uppercase; color: var(--mist); }
+  .total-budget-note { font-size: 0.6rem; color: var(--mist); font-style: italic; margin-top: 4px; }
+  .total-amount { font-family: 'Cormorant Garamond', serif; font-size: 2rem; color: var(--gold); font-weight: 300; }
+
+  /* ─── Shopping Strategy ───────────────────────────────────────── */
+  .strategy-card {
+    background: linear-gradient(135deg, rgba(126,184,196,0.04) 0%, rgba(126,184,196,0.01) 100%);
+    border: 1px solid rgba(126,184,196,0.15);
+    border-radius: 2px; padding: 36px 44px;
+    margin-bottom: 32px; position: relative; overflow: hidden;
+  }
+  .strategy-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--electric), transparent);
+  }
+  .strategy-label {
+    font-size: 0.57rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--electric); margin-bottom: 22px;
+    font-weight: 500;
+  }
+  .strategy-list { display: flex; flex-direction: column; gap: 14px; }
+  .strategy-item { display: flex; align-items: flex-start; gap: 16px; }
+  .strategy-pct {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem; font-weight: 300; color: var(--electric);
+    line-height: 1; min-width: 56px;
+  }
+  .strategy-detail {}
+  .strategy-category {
+    font-size: 0.62rem; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--cream); margin-bottom: 3px;
+  }
+  .strategy-reason { font-size: 0.7rem; color: var(--mist); line-height: 1.7; }
+
+  /* ─── Products Grid ───────────────────────────────────────────── */
+  .products-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 24px; margin-bottom: 32px;
+  }
+  .product-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(201,168,76,0.12);
+    border-radius: 2px; transition: all 0.4s;
+    position: relative; overflow: hidden;
+    animation: fadeUp 0.6s ease both;
+    display: flex; flex-direction: column;
+  }
+  .product-card:hover {
+    border-color: rgba(201,168,76,0.35);
+    transform: translateY(-4px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.4), 0 0 40px rgba(201,168,76,0.05);
+  }
+  .product-card::before {
+    content: ''; position: absolute;
+    top: 0; left: 0; width: 3px; height: 0;
+    background: linear-gradient(180deg, var(--gold), transparent);
+    transition: height 0.4s;
+  }
+  .product-card:hover::before { height: 100%; }
+
+  /* Product image placeholder */
+  .product-img-zone {
+    width: 100%; aspect-ratio: 4/3;
+    background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+    border-bottom: 1px solid rgba(201,168,76,0.08);
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .product-img-placeholder {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .product-img-icon { font-size: 2.2rem; opacity: 0.25; }
+  .product-img-label {
+    font-size: 0.52rem; letter-spacing: 0.25em;
+    text-transform: uppercase; color: var(--mist); opacity: 0.4;
+  }
+  .product-img-tag {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(201,168,76,0.12);
+    border: 1px solid rgba(201,168,76,0.25);
+    padding: 4px 10px; border-radius: 100px;
+    font-size: 0.52rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--gold);
+  }
+
+  /* Product body */
+  .product-body { padding: 24px 26px; flex: 1; display: flex; flex-direction: column; }
+  .product-category {
+    font-size: 0.53rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--gold);
+    margin-bottom: 10px; font-weight: 500;
+  }
+  .product-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.25rem; font-weight: 400;
+    color: var(--cream); line-height: 1.25; margin-bottom: 4px;
+  }
+  .product-brand {
+    font-size: 0.6rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--mist); margin-bottom: 14px;
+  }
+  .product-divider {
+    height: 1px;
+    background: linear-gradient(90deg, rgba(201,168,76,0.25), transparent);
+    margin-bottom: 14px;
+  }
+  .product-desc {
+    font-size: 0.7rem; line-height: 1.85;
+    color: var(--mist); margin-bottom: 16px; flex: 1;
+  }
+  .product-decision-note {
+    background: rgba(201,168,76,0.05);
+    border-left: 2px solid var(--gold);
+    padding: 10px 14px; margin-bottom: 18px;
+    font-size: 0.65rem; color: var(--cream);
+    line-height: 1.7; opacity: 0.85;
+  }
+
+  /* Product footer */
+  .product-footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+  .product-price-block {}
+  .product-price-label { font-size: 0.52rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--mist); }
+  .product-price {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.55rem; font-weight: 300; color: var(--gold);
+  }
+  .product-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .product-pct {
+    background: rgba(201,168,76,0.1);
+    border: 1px solid rgba(201,168,76,0.2);
+    padding: 4px 10px; font-size: 0.58rem;
+    letter-spacing: 0.08em; color: var(--gold); border-radius: 100px;
+  }
+  /* Buy Now — ready for real links */
+  .btn-buy {
+    background: transparent;
+    border: 1px solid rgba(201,168,76,0.35);
+    color: var(--gold); padding: 8px 16px;
+    font-family: 'Montserrat', sans-serif;
+    font-size: 0.58rem; font-weight: 500;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    cursor: pointer; transition: all 0.25s;
+    border-radius: 1px; text-decoration: none;
+    display: inline-block;
+    /* data-store-url and data-product-id ready for retailer feeds */
+  }
+  .btn-buy:hover {
+    background: var(--gold); color: var(--warm-black);
+    box-shadow: 0 4px 20px rgba(201,168,76,0.25);
+  }
+  .btn-buy.unavailable { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+  /* ─── Decision Summary ────────────────────────────────────────── */
+  .decision-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%);
+    border: 1px solid rgba(201,168,76,0.12);
+    border-radius: 2px; padding: 40px 44px;
+    margin-bottom: 32px;
+  }
+  .decision-label {
+    font-size: 0.57rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--gold);
+    margin-bottom: 24px; font-weight: 500;
+  }
+  .decision-items { display: flex; flex-direction: column; gap: 20px; }
+  .decision-item { display: flex; gap: 20px; align-items: flex-start; }
+  .decision-item-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.6rem; font-weight: 300; color: rgba(201,168,76,0.35);
+    line-height: 1; min-width: 32px; padding-top: 2px;
+  }
+  .decision-item-body {}
+  .decision-item-name {
+    font-size: 0.65rem; font-weight: 600;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--cream); margin-bottom: 4px;
+  }
+  .decision-item-text { font-size: 0.72rem; color: var(--mist); line-height: 1.8; }
+
+  /* ─── Optimization Summary ────────────────────────────────────── */
+  .optimization-card {
+    background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.005) 100%);
+    border: 1px solid rgba(201,168,76,0.12);
+    border-radius: 2px; padding: 40px 44px;
+    position: relative; overflow: hidden;
+    margin-bottom: 32px;
+  }
+  .optimization-card::before {
+    content: '→';
+    position: absolute; top: 24px; right: 36px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 7rem; color: rgba(201,168,76,0.05); line-height: 1;
+    pointer-events: none;
+  }
+  .optimization-label {
+    font-size: 0.57rem; letter-spacing: 0.35em;
+    text-transform: uppercase; color: var(--gold);
+    margin-bottom: 20px; font-weight: 500;
+  }
+  .optimization-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.1rem; font-weight: 300;
+    line-height: 1.9; color: var(--cream); opacity: 0.9;
+  }
+
+  /* ─── Ornament ────────────────────────────────────────────────── */
+  .ornament-divider {
+    display: flex; align-items: center; gap: 20px;
+    margin: 48px 0; opacity: 0.3;
+  }
+  .ornament-divider::before, .ornament-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--gold);
+  }
+  .ornament-divider span { font-family: 'Cormorant Garamond', serif; font-size: 1.2rem; color: var(--gold); }
+
+  /* ─── Error ───────────────────────────────────────────────────── */
+  .error-box {
+    border: 1px solid rgba(212,165,165,0.3);
+    background: rgba(212,165,165,0.05);
+    padding: 16px 24px; margin-top: 20px;
+    border-radius: 2px; font-size: 0.73rem;
+    color: var(--blush); letter-spacing: 0.04em; display: none;
+  }
+  .error-box.visible { display: block; }
+
+  /* ─── Animations ──────────────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0);    }
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1);    }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* ─── Responsive ──────────────────────────────────────────────── */
+  @media (max-width: 768px) {
+    header { padding: 28px 20px; }
+    .logo { font-size: 1.7rem; }
+    main { padding: 36px 18px 80px; }
+    .form-card { padding: 30px 22px; }
+    .form-grid { grid-template-columns: 1fr; gap: 22px; }
+    .goal-grid { grid-template-columns: 1fr 1fr; }
+    .products-grid { grid-template-columns: 1fr; }
+    .score-row { grid-template-columns: 1fr 1fr; }
+    .budget-bar-name { width: 100px; font-size: 0.6rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<!-- ── Header ─────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">Shop<span>Pilot</span></div>
+  <div class="header-right">
+    <span class="tagline">Smart Wardrobe Optimization</span>
+    <div class="header-badge">
+      <span class="badge-dot"></span>
+      AI Decision Engine
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── Hero ───────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-eyebrow">◈ AI Shopping Decision Engine</div>
+    <h1>Tell us your budget.<br><em>We'll tell you what to buy.</em></h1>
+    <p class="hero-sub">ShopPilot analyzes your goals, constraints, and occasion to deliver an optimized purchasing plan — not inspiration, but a precise spending strategy.</p>
+    <div class="hero-pills">
+      <span class="hero-pill">Goal-Driven Allocation</span>
+      <span class="hero-pill">Budget Intelligence</span>
+      <span class="hero-pill">Decision Reasoning</span>
+      <span class="hero-pill">Strategy Breakdown</span>
+    </div>
+  </section>
+
+  <!-- ── Form Card ──────────────────────────────────────────────── -->
+  <div class="form-card">
+
+    <!-- Section: Parameters -->
+    <div class="form-section-label">01 — Purchase Parameters</div>
+    <div class="form-grid">
+      <div class="field-group">
+        <label class="field-label">Total Budget</label>
+        <input type="number" class="field-input" id="budget" placeholder="e.g. 500" min="50">
+        <select class="field-input" id="currency" style="margin-top:8px">
+          <option value="USD">USD — US Dollar</option>
+          <option value="EUR">EUR — Euro</option>
+          <option value="GBP">GBP — British Pound</option>
+          <option value="AED">AED — UAE Dirham</option>
+          <option value="SAR">SAR — Saudi Riyal</option>
+          <option value="EGP">EGP — Egyptian Pound</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="field-label">Use Case / Occasion</label>
+        <select class="field-input" id="occasion">
+          <option value="">Select occasion…</option>
+          <option>Black-Tie Gala</option>
+          <option>Business Meeting</option>
+          <option>Cocktail Party</option>
+          <option>Date Night</option>
+          <option>Weekend Getaway</option>
+          <option>Summer Holiday</option>
+          <option>Casual Everyday</option>
+          <option>Wedding Guest</option>
+          <option>Art Gallery Opening</option>
+          <option>Job Interview</option>
+          <option>Outdoor Festival</option>
+          <option>Gym & Activewear</option>
+        </select>
+        <input type="text" class="field-input" id="occasion-custom" placeholder="Or describe your use case…" style="margin-top:8px">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Shopping For</label>
+        <select class="field-input" id="gender">
+          <option value="Women">Women</option>
+          <option value="Men">Men</option>
+          <option value="Non-binary">Non-binary / Gender-fluid</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Section: Optimization Goal (REQUIRED) -->
+    <div class="goal-section">
+      <div class="form-section-label">02 — Optimization Goal <span style="color:var(--blush);font-style:italic;font-family:'Cormorant Garamond',serif;font-size:0.75rem;letter-spacing:0.05em"> — required</span></div>
+      <div class="goal-grid" id="goal-grid">
+        <button class="goal-card" data-goal="Best Value" onclick="selectGoal(this)">
+          <span class="goal-icon">◎</span>
+          <div class="goal-name">Best Value</div>
+          <div class="goal-desc">Maximize quality per dollar. Prioritize durable materials and value-driven brands over labels.</div>
+        </button>
+        <button class="goal-card" data-goal="Most Versatile" onclick="selectGoal(this)">
+          <span class="goal-icon">⊕</span>
+          <div class="goal-name">Most Versatile</div>
+          <div class="goal-desc">Build the highest number of outfit combinations. Prioritize neutral colors and reusable pieces.</div>
+        </button>
+        <button class="goal-card" data-goal="Best Looking" onclick="selectGoal(this)">
+          <span class="goal-icon">◈</span>
+          <div class="goal-name">Best Looking</div>
+          <div class="goal-desc">Maximize aesthetic impact. Prioritize statement pieces and high-visibility garments.</div>
+        </button>
+        <button class="goal-card" data-goal="Trend Focused" onclick="selectGoal(this)">
+          <span class="goal-icon">◇</span>
+          <div class="goal-name">Trend Focused</div>
+          <div class="goal-desc">Prioritize current season trends and culturally relevant pieces over timeless classics.</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Section: Style -->
+    <div class="field-group" style="margin-bottom:36px">
+      <div class="form-section-label" style="margin-bottom:16px">03 — Style Aesthetic</div>
+      <div class="chips" id="style-chips">
+        <button class="chip" data-style="Minimalist">Minimalist</button>
+        <button class="chip" data-style="Old Money">Old Money</button>
+        <button class="chip" data-style="Street Luxe">Street Luxe</button>
+        <button class="chip" data-style="Bohemian">Bohemian</button>
+        <button class="chip" data-style="Avant-Garde">Avant-Garde</button>
+        <button class="chip" data-style="Classic Tailored">Classic Tailored</button>
+        <button class="chip" data-style="Coastal Chic">Coastal Chic</button>
+        <button class="chip" data-style="Dark Academia">Dark Academia</button>
+        <button class="chip" data-style="Y2K Revival">Y2K Revival</button>
+        <button class="chip" data-style="Athleisure">Athleisure</button>
+        <button class="chip" data-style="Romantic">Romantic</button>
+        <button class="chip" data-style="Power Dressing">Power Dressing</button>
+      </div>
+    </div>
+
+    <!-- Section: Additional Constraints -->
+    <div class="field-group" style="margin-bottom:36px">
+      <div class="form-section-label" style="margin-bottom:16px">04 — Constraints & Notes <span style="color:var(--mist);font-style:italic;font-family:'Cormorant Garamond',serif;font-size:0.75rem;letter-spacing:0.05em"> — optional</span></div>
+      <input type="text" class="field-input" id="notes" placeholder="e.g. prefer sustainable brands, no animal leather, size M, avoid fast fashion…">
+    </div>
+
+    <div class="cta-row">
+      <button class="btn-generate" id="generate-btn" onclick="generatePlan()">
+        ◈ &nbsp; Run Decision Engine
+      </button>
+    </div>
+
+    <div class="error-box" id="error-box"></div>
+  </div>
+
+  <!-- ── Loading ──────────────────────────────────────────────────── -->
+  <div class="loading-state" id="loading-state">
+    <div class="loading-ornament"></div>
+    <div class="loading-text">Analyzing your purchasing parameters…</div>
+    <div class="loading-sub">Optimizing budget allocation</div>
+  </div>
+
+  <!-- ── Results ──────────────────────────────────────────────────── -->
+  <div class="results" id="results">
+    <div class="ornament-divider"><span>◈</span></div>
+
+    <div class="results-header">
+      <div class="results-eyebrow">Optimized Purchase Plan</div>
+      <div class="results-title" id="results-title">—</div>
+      <div class="results-goal-badge" id="results-goal-badge">
+        <span id="results-goal-icon">◎</span>
+        <span id="results-goal-text">Best Value</span>
+      </div>
+    </div>
+
+    <!-- Score cards -->
+    <div class="score-row" id="score-row"></div>
+
+    <!-- Budget allocation -->
+    <div class="budget-overview">
+      <div class="budget-label">Budget Allocation</div>
+      <div class="budget-bars" id="budget-bars"></div>
+      <div class="total-row">
+        <div>
+          <div class="total-label">Estimated Total Spend</div>
+          <div class="total-budget-note" id="budget-remaining"></div>
+        </div>
+        <div class="total-amount" id="total-amount"></div>
+      </div>
+    </div>
+
+    <!-- Shopping Strategy -->
+    <div class="strategy-card" id="strategy-card">
+      <div class="strategy-label">◈ Shopping Strategy</div>
+      <div class="strategy-list" id="strategy-list"></div>
+    </div>
+
+    <!-- Products -->
+    <div class="products-grid" id="products-grid"></div>
+
+    <!-- Decision Summary -->
+    <div class="decision-card">
+      <div class="decision-label">◎ Decision Summary — Why These Items?</div>
+      <div class="decision-items" id="decision-items"></div>
+    </div>
+
+    <!-- Optimization Analysis -->
+    <div class="optimization-card">
+      <div class="optimization-label">→ Optimization Analysis</div>
+      <div class="optimization-text" id="optimization-text"></div>
+    </div>
+
+    <!-- Reset -->
+    <div style="text-align:center;margin-top:52px">
+      <button class="btn-generate" onclick="resetApp()" style="background:transparent;color:var(--gold);border:1px solid rgba(201,168,76,0.3)">
+        ← &nbsp; New Decision Run
+      </button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+/* ================================================================
+   ShopPilot — AI Shopping Decision Engine
+   Architecture prepared for:
+   - Retailer scraping (product cards carry data-store-url, data-product-id)
+   - Live product feeds (products array extensible with feedSource, feedId)
+   - Affiliate links (btn-buy targets data-affiliate-url)
+   - Recommendation scoring (score fields in product schema)
+   - Product database integration (product.dbId field ready)
+   ================================================================ */
+
+  // ── State ───────────────────────────────────────────────────────
+  let selectedStyles = [];
+  let selectedGoal   = null;
+
+  // ── Style chips ─────────────────────────────────────────────────
+  document.querySelectorAll('#style-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      chip.classList.toggle('active');
+      const s = chip.dataset.style;
+      selectedStyles = chip.classList.contains('active')
+        ? [...selectedStyles, s]
+        : selectedStyles.filter(x => x !== s);
+    });
+  });
+
+  // ── Goal selection ───────────────────────────────────────────────
+  function selectGoal(el) {
+    document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    selectedGoal = el.dataset.goal;
+  }
+
+  // ── Main: generate ───────────────────────────────────────────────
+  async function generatePlan() {
+    const budget   = document.getElementById('budget').value;
+    const currency = document.getElementById('currency').value;
+    const occSel   = document.getElementById('occasion').value;
+    const occCust  = document.getElementById('occasion-custom').value.trim();
+    const gender   = document.getElementById('gender').value;
+    const notes    = document.getElementById('notes').value.trim();
+    const errorBox = document.getElementById('error-box');
+
+    errorBox.classList.remove('visible');
+
+    if (!budget || parseFloat(budget) < 50) {
+      return showError('Please enter a budget of at least 50.');
+    }
+    const occasion = occCust || occSel;
+    if (!occasion) return showError('Please select or describe an occasion / use case.');
+    if (!selectedGoal) return showError('Please select an Optimization Goal to continue.');
+    if (selectedStyles.length === 0) return showError('Please select at least one style aesthetic.');
+
+    setLoading(true);
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: buildSystemPrompt(),
+          messages: [{ role: 'user', content: buildUserPrompt({ budget, currency, occasion, gender, goal: selectedGoal, styles: selectedStyles, notes }) }]
+        })
+      });
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error.message);
+
+      const raw   = data.content.map(c => c.text || '').join('');
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const plan  = JSON.parse(clean);
+
+      renderResults(plan, budget, currency, selectedGoal);
+    } catch (err) {
+      console.error(err);
+      showError('The decision engine encountered an error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── System prompt ────────────────────────────────────────────────
+  function buildSystemPrompt() {
+    return `You are ShopPilot, an AI Shopping Decision Engine. Your role is NOT to be a fashion stylist — you are a purchasing advisor that makes optimized, data-driven clothing budget decisions.
+
+Return ONLY a JSON object (no markdown, no backticks, no preamble) with EXACTLY this structure:
+{
+  "plan_title": "string — analytical 4-6 word title describing the purchase strategy",
+  "optimization_goal": "string — echo back the optimization goal",
+  "scores": {
+    "value_score": number (1-10),
+    "versatility_score": number (1-10),
+    "aesthetic_score": number (1-10),
+    "trend_score": number (1-10)
+  },
+  "products": [
+    {
+      "category": "string",
+      "name": "string — specific product name",
+      "brand": "string — realistic brand appropriate to budget",
+      "description": "string — factual product description",
+      "decision_note": "string — 1 sentence explaining WHY this item was selected based on the optimization goal",
+      "price": number,
+      "budget_pct": number,
+      "store_url": "",
+      "product_id": "",
+      "affiliate_url": "",
+      "feed_source": "",
+      "db_id": ""
+    }
+  ],
+  "total": number,
+  "budget_remaining": number,
+  "shopping_strategy": [
+    {
+      "category": "string",
+      "pct": number,
+      "reason": "string — analytical reason why this % was allocated based on the optimization goal"
+    }
+  ],
+  "decision_summary": [
+    {
+      "item_name": "string",
+      "reason": "string — 1-2 sentences of analytical reasoning for this purchase decision"
+    }
+  ],
+  "optimization_analysis": "string — 3-4 sentences of analytical, advisor-style reasoning explaining how the overall budget allocation maximizes the chosen optimization goal. Sound like a purchasing consultant, not a stylist."
+}
+
+Rules:
+- Recommend 4-6 products forming a complete wardrobe solution
+- Products, brands, and allocation MUST heavily reflect the optimization goal:
+    Best Value: favor quality basics, value brands (Uniqlo, COS, Everlane), durable materials
+    Most Versatile: favor neutral colors, multi-use pieces, interchangeable items
+    Best Looking: favor statement pieces, strong silhouettes, high-visibility garments
+    Trend Focused: favor current season trends, culturally relevant brands
+- Prices must be realistic for brand and currency
+- Total must not exceed budget; budget_pct values must sum to 100
+- shopping_strategy pcts should roughly match product allocation
+- Tone must be analytical and advisory, never aesthetic/stylistic
+- Return ONLY the JSON`;
+  }
+
+  // ── User prompt ──────────────────────────────────────────────────
+  function buildUserPrompt({ budget, currency, occasion, gender, goal, styles, notes }) {
+    return `Budget: ${budget} ${currency}
+Occasion/Use Case: ${occasion}
+Shopping For: ${gender}
+Optimization Goal: ${goal}
+Style Aesthetic Preferences: ${styles.join(', ')}
+${notes ? `Constraints: ${notes}` : ''}
+
+Generate an optimized purchase plan that maximizes the "${goal}" objective within this budget.`;
+  }
+
+  // ── Render results ───────────────────────────────────────────────
+  function renderResults(plan, budget, currency, goal) {
+    const sym = getCurrencySymbol(currency);
+
+    // Header
+    document.getElementById('results-title').textContent = plan.plan_title;
+    document.getElementById('results-goal-text').textContent = goal;
+    const goalIconMap = { 'Best Value': '◎', 'Most Versatile': '⊕', 'Best Looking': '◈', 'Trend Focused': '◇' };
+    document.getElementById('results-goal-icon').textContent = goalIconMap[goal] || '◈';
+
+    // Score cards
+    const scoreLabels = [
+      { key: 'value_score',       label: 'Value Score',       icon: '◎' },
+      { key: 'versatility_score', label: 'Versatility',       icon: '⊕' },
+      { key: 'aesthetic_score',   label: 'Aesthetic Impact',  icon: '◈' },
+      { key: 'trend_score',       label: 'Trend Relevance',   icon: '◇' }
+    ];
+    document.getElementById('score-row').innerHTML = scoreLabels.map(s => `
+      <div class="score-card">
+        <div class="score-label">${s.icon} ${s.label}</div>
+        <div class="score-value">${plan.scores[s.key]}<span>/10</span></div>
+        <div class="score-bar-track">
+          <div class="score-bar-fill" data-pct="${plan.scores[s.key] * 10}" style="width:0"></div>
+        </div>
+      </div>`).join('');
+
+    // Budget bars
+    document.getElementById('budget-bars').innerHTML = plan.products.map(p => `
+      <div class="budget-bar-row">
+        <div class="budget-bar-name">${p.category}</div>
+        <div class="budget-bar-track"><div class="budget-bar-fill" data-pct="${p.budget_pct}"></div></div>
+        <div class="budget-bar-amount">${sym}${p.price.toLocaleString()}</div>
+      </div>`).join('');
+
+    // Totals
+    document.getElementById('total-amount').textContent = `${sym}${plan.total.toLocaleString()}`;
+    const remaining = parseFloat(budget) - plan.total;
+    document.getElementById('budget-remaining').textContent = remaining >= 0
+      ? `${sym}${remaining.toLocaleString()} unallocated from ${sym}${parseFloat(budget).toLocaleString()} budget`
+      : `${sym}${Math.abs(remaining).toLocaleString()} over budget`;
+
+    // Shopping strategy
+    document.getElementById('strategy-list').innerHTML = (plan.shopping_strategy || []).map(s => `
+      <div class="strategy-item">
+        <div class="strategy-pct">${s.pct}%</div>
+        <div class="strategy-detail">
+          <div class="strategy-category">${s.category}</div>
+          <div class="strategy-reason">${s.reason}</div>
+        </div>
+      </div>`).join('');
+
+    // Products
+    document.getElementById('products-grid').innerHTML = plan.products.map((p, i) => `
+      <div class="product-card" style="animation-delay:${i * 0.08}s">
+        <div class="product-img-zone">
+          <div class="product-img-placeholder">
+            <div class="product-img-icon">${getCategoryIcon(p.category)}</div>
+            <div class="product-img-label">Product Image</div>
+          </div>
+          <div class="product-img-tag">${p.budget_pct}% of budget</div>
+        </div>
+        <div class="product-body">
+          <div class="product-category">${p.category}</div>
+          <div class="product-name">${p.name}</div>
+          <div class="product-brand">${p.brand}</div>
+          <div class="product-divider"></div>
+          <div class="product-desc">${p.description}</div>
+          ${p.decision_note ? `<div class="product-decision-note">◎ ${p.decision_note}</div>` : ''}
+          <div class="product-footer">
+            <div class="product-price-block">
+              <div class="product-price-label">Est. Price</div>
+              <div class="product-price">${sym}${p.price.toLocaleString()}</div>
+            </div>
+            <div class="product-actions">
+              <div class="product-pct">${p.budget_pct}%</div>
+              <a class="btn-buy unavailable"
+                 data-store-url="${p.store_url || ''}"
+                 data-product-id="${p.product_id || ''}"
+                 data-affiliate-url="${p.affiliate_url || ''}"
+                 data-feed-source="${p.feed_source || ''}"
+                 data-db-id="${p.db_id || ''}"
+                 title="Live product links coming soon">
+                Buy Now ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>`).join('');
+
+    // Decision summary
+    document.getElementById('decision-items').innerHTML = (plan.decision_summary || []).map((d, i) => `
+      <div class="decision-item">
+        <div class="decision-item-num">${String(i + 1).padStart(2, '0')}</div>
+        <div class="decision-item-body">
+          <div class="decision-item-name">${d.item_name}</div>
+          <div class="decision-item-text">${d.reason}</div>
+        </div>
+      </div>`).join('');
+
+    // Optimization analysis
+    document.getElementById('optimization-text').textContent = plan.optimization_analysis;
+
+    // Animate bars
+    document.getElementById('results').classList.add('visible');
+    setTimeout(() => {
+      document.querySelectorAll('.budget-bar-fill, .score-bar-fill').forEach(bar => {
+        bar.style.width = bar.dataset.pct + '%';
+      });
+    }, 120);
+
+    document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function getCurrencySymbol(code) {
+    return { USD: '$', EUR: '€', GBP: '£', AED: 'AED ', SAR: 'SAR ', EGP: 'EGP ' }[code] || (code + ' ');
+  }
+
+  function getCategoryIcon(cat = '') {
+    const c = cat.toLowerCase();
+    if (c.includes('shoe') || c.includes('boot') || c.includes('foot')) return '👟';
+    if (c.includes('jacket') || c.includes('coat') || c.includes('outer')) return '🧥';
+    if (c.includes('trouser') || c.includes('pant') || c.includes('jean')) return '👖';
+    if (c.includes('top') || c.includes('shirt') || c.includes('blouse')) return '👕';
+    if (c.includes('dress') || c.includes('skirt')) return '👗';
+    if (c.includes('bag') || c.includes('accessory') || c.includes('belt')) return '👜';
+    if (c.includes('watch') || c.includes('jewel')) return '⌚';
+    return '🛍';
+  }
+
+  function showError(msg) {
+    const e = document.getElementById('error-box');
+    e.textContent = msg; e.classList.add('visible');
+  }
+
+  function setLoading(on) {
+    document.getElementById('generate-btn').disabled = on;
+    document.getElementById('loading-state').classList.toggle('visible', on);
+    if (on) document.getElementById('results').classList.remove('visible');
+  }
+
+  function resetApp() {
+    document.getElementById('results').classList.remove('visible');
+    document.getElementById('error-box').classList.remove('visible');
+    ['budget', 'occasion-custom', 'notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('occasion').value = '';
+    selectedStyles = []; selectedGoal = null;
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.goal-card').forEach(c => c.classList.remove('active'));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
